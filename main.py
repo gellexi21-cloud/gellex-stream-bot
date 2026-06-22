@@ -33,16 +33,20 @@ def get_stream(token):
             "Authorization": f"Bearer {token}",
         },
     )
-    data = r.json()["data"]
-    return data[0] if data else None
+
+    data = r.json().get("data", [])
+
+    if len(data) > 0:
+        return data[0]
+
+    return None
 
 
 def send_message(title, game):
     text = (
         f"🔴 Gelle_x вышла в эфир!\n\n"
         f"🎮 {game}\n"
-        f"📝 {title}\n\n"
-        f"https://twitch.tv/{TWITCH_USERNAME}"
+        f"📝 {title}"
     )
 
     r = requests.post(
@@ -50,10 +54,22 @@ def send_message(title, game):
         json={
             "chat_id": TELEGRAM_CHANNEL,
             "text": text,
+            "reply_markup": {
+                "inline_keyboard": [[
+                    {
+                        "text": "🎥 Смотреть стрим",
+                        "url": f"https://twitch.tv/{TWITCH_USERNAME}"
+                    }
+                ]]
+            }
         },
     )
 
-    return r.json()["result"]["message_id"]
+    result = r.json()
+
+    print("Telegram response:", result)
+
+    return result["result"]["message_id"]
 
 
 def delete_message(msg_id):
@@ -68,23 +84,32 @@ def delete_message(msg_id):
 
 token = get_token()
 
+print("Bot started")
+print("Watching:", TWITCH_USERNAME)
+
 while True:
     try:
         stream = get_stream(token)
 
         if stream and not was_live:
+            print("Stream started")
+
             message_id = send_message(
                 stream["title"],
                 stream["game_name"]
             )
+
             was_live = True
 
         elif not stream and was_live:
+            print("Stream ended")
+
             delete_message(message_id)
+
             was_live = False
             message_id = None
 
     except Exception as e:
-        print(e)
+        print("ERROR:", e)
 
     time.sleep(60)
